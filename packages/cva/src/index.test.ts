@@ -1734,6 +1734,14 @@ describe("cva", () => {
       ])("button(%o)", (options, expected) => {
         test(`returns ${expected}`, () => {
           expect(buttonWithBaseWithDefaultsString(options)).toBe(expected);
+          expect(buttonWithBaseWithDefaultsString.variants).toEqual([
+            "intent",
+            "disabled",
+            "size",
+          ]);
+          expectTypeOf(buttonWithBaseWithDefaultsString.variants).toEqualTypeOf<
+            Array<"intent" | "disabled" | "size">
+          >();
           expect(buttonWithBaseWithDefaultsWithClassNameString(options)).toBe(
             expected,
           );
