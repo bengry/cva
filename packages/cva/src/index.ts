@@ -56,10 +56,9 @@ export type VariantProps<Component extends (...args: any) => any> = Omit<
 /* compose
   ---------------------------------- */
 
+type CVABuilderFunction<V> = ReturnType<typeof cva<any, V>>
 export interface Compose {
-  <T extends ReturnType<CVA>[]>(
-    ...components: [...T]
-  ): (
+  <T extends CVABuilderFunction<any>[]>(...components: [...T]): (
     props?: (
       | UnionToIntersection<
         {
