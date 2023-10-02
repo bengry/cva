@@ -81,6 +81,10 @@ describe("compose", () => {
         }
       | undefined
     >();
+    expectTypeOf(card.variants).toMatchTypeOf<{
+      shadow: ReadonlyArray<"sm" | "md">;
+      gap: ReadonlyArray<"unset" | 1 | 2 | 3>;
+    }>();
 
     expect(card()).toBe("shadow-sm");
     expect(card({ class: "adhoc-class" })).toBe("shadow-sm adhoc-class");
@@ -93,6 +97,7 @@ describe("compose", () => {
     expect(card({ shadow: "md", gap: 3, className: "adhoc-class" })).toBe(
       "shadow-md gap-3 adhoc-class",
     );
+    expect(card.variants).toEqual(["shadow", "gap"]);
   });
 });
 
@@ -1739,9 +1744,15 @@ describe("cva", () => {
             "disabled",
             "size",
           ]);
-          expectTypeOf(buttonWithBaseWithDefaultsString.variants).toEqualTypeOf<
-            Array<"intent" | "disabled" | "size">
-          >();
+          expectTypeOf(
+            buttonWithBaseWithDefaultsString.variants,
+          ).toEqualTypeOf<{
+            intent: ReadonlyArray<
+              "unset" | "primary" | "secondary" | "warning" | "danger"
+            >;
+            disabled: ReadonlyArray<"true" | "false" | "unset">;
+            size: ReadonlyArray<"unset" | "small" | "medium" | "large">;
+          }>();
           expect(buttonWithBaseWithDefaultsWithClassNameString(options)).toBe(
             expected,
           );

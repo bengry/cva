@@ -50,25 +50,29 @@ type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
 
 export type VariantProps<Component extends (...args: any) => any> = Omit<
   OmitUndefined<Parameters<Component>[0]>,
-  "class" | "className"
+  "class" | "className" | `$${string}`
 >;
 
 /* compose
   ---------------------------------- */
 
-type CVABuilderFunction<V> = ReturnType<typeof cva<any, V>>
+type CVABuilderFunction<V> = ReturnType<typeof cva<any, V>>;
 export interface Compose {
-  <T extends CVABuilderFunction<any>[]>(...components: [...T]): (
+  <T extends CVABuilderFunction<any>[]>(
+    ...components: [...T]
+  ): ((
     props?: (
       | UnionToIntersection<
-        {
-          [K in keyof T]: VariantProps<T[K]>;
-        }[number]
-      >
+          {
+            [K in keyof T]: VariantProps<T[K]>;
+          }[number]
+        >
       | undefined
     ) &
       CVAClassProp,
-  ) => string;
+  ) => string) & {
+    variants: UnionToIntersection<Exclude<T[number]["variants"], never>>;
+  };
 }
 
 /* cx
@@ -91,13 +95,13 @@ type CVAVariantSchema<V extends CVAVariantShape> = {
 };
 type CVAClassProp =
   | {
-    class?: ClassValue;
-    className?: never;
-  }
+      class?: ClassValue;
+      className?: never;
+    }
   | {
-    class?: never;
-    className?: ClassValue;
-  };
+      class?: never;
+      className?: ClassValue;
+    };
 
 export interface CVA {
   <
@@ -106,32 +110,36 @@ export interface CVA {
   >(
     config: V extends CVAVariantShape
       ? CVAConfigBase & {
-        variants?: V;
-        compoundVariants?: (V extends CVAVariantShape
-          ? (
-            | CVAVariantSchema<V>
-            | {
-              [Variant in keyof V]?:
-              | StringToBoolean<keyof V[Variant]>
-              | StringToBoolean<keyof V[Variant]>[]
-              | undefined;
-            }
-          ) &
-          CVAClassProp
-          : CVAClassProp)[];
-        defaultVariants?: CVAVariantSchema<V>;
-      }
+          variants?: V;
+          compoundVariants?: (V extends CVAVariantShape
+            ? (
+                | CVAVariantSchema<V>
+                | {
+                    [Variant in keyof V]?:
+                      | StringToBoolean<keyof V[Variant]>
+                      | readonly StringToBoolean<keyof V[Variant]>[]
+                      | undefined;
+                  }
+              ) &
+                CVAClassProp
+            : CVAClassProp)[];
+          defaultVariants?: CVAVariantSchema<V>;
+        }
       : CVAConfigBase & {
-        variants?: never;
-        compoundVariants?: never;
-        defaultVariants?: never;
-      }
+          variants?: never;
+          compoundVariants?: never;
+          defaultVariants?: never;
+        },
   ): ((
     props?: V extends CVAVariantShape
       ? CVAVariantSchema<V> & CVAClassProp
-      : CVAClassProp
+      : CVAClassProp,
   ) => string) & {
-    variants: V extends CVAVariantShape ? (keyof V)[] : never
+    variants: V extends CVAVariantShape
+      ? {
+          [K in keyof V]: ReadonlyArray<Extract<keyof V[K], string | number>>;
+        }
+      : never;
   };
 }
 
@@ -141,7 +149,7 @@ export interface CVA {
 export interface DefineConfigOptions {
   hooks?: {
     /**
-     * @deprecated please use `onComplete`
+     * @deprecated please use `onComplete`
      */
     "cx:done"?: (className: string) => string;
     /**
@@ -167,10 +175,10 @@ const falsyToString = <T extends unknown>(value: T) =>
 
 export const defineConfig: DefineConfig = (options) => {
   const cx: CX = (...inputs) => {
-    if (typeof options?.hooks?.["cx:done"] !== "undefined")
+    if (options?.hooks?.["cx:done"] !== undefined)
       return options?.hooks["cx:done"](clsx(inputs));
 
-    if (typeof options?.hooks?.onComplete !== "undefined")
+    if (options?.hooks?.onComplete !== undefined)
       return options?.hooks.onComplete(clsx(inputs));
 
     return clsx(inputs);
@@ -190,11 +198,11 @@ export const defineConfig: DefineConfig = (options) => {
 
           const variantKey = (falsyToString(variantProp) ||
             falsyToString(
-              defaultVariantProp
+              defaultVariantProp,
             )) as keyof (typeof variants)[typeof variant];
 
-          return variants[variant][variantKey];
-        }
+          return variants[variant]![variantKey];
+        },
       );
 
       const defaultsAndProps = {
@@ -202,9 +210,14 @@ export const defineConfig: DefineConfig = (options) => {
         // remove `undefined` props
         ...(props &&
           Object.entries(props).reduce<typeof props>(
-            (acc, [key, value]) =>
-              typeof value === "undefined" ? acc : { ...acc, [key]: value },
-            {} as typeof props
+            (acc, [key, value]) => {
+              if (value !== undefined) {
+                Object.assign(acc, { [key]: value });
+              }
+
+              return acc;
+            },
+            {} as typeof props,
           )),
       };
 
@@ -220,7 +233,7 @@ export const defineConfig: DefineConfig = (options) => {
           })
             ? [...acc, cvClass, cvClassName]
             : acc,
-        [] as ClassValue[]
+        [] as ClassValue[],
       );
 
       return cx(
@@ -228,30 +241,54 @@ export const defineConfig: DefineConfig = (options) => {
         getVariantClassNames,
         getCompoundVariantClassNames,
         props?.class,
-        props?.className
+        props?.className,
       );
     }) as ReturnType<CVA>;
 
     return Object.assign(cvaClassBuilder, {
-      variants: Object.keys(variants ?? {})
-    })
-  }
-
-  const compose: Compose =
-    (...components) =>
-      (props) => {
-        const propsWithoutClass = Object.fromEntries(
-          Object.entries(props || {}).filter(
-            ([key]) => !["class", "className"].includes(key)
+      variants: variants
+        ? Object.fromEntries(
+            Object.entries(variants).map(([key, value]) => [
+              key,
+              Object.keys(value),
+            ]),
           )
-        );
+        : {},
+    });
+  };
 
-        return cx(
-          components.map((component) => component(propsWithoutClass)),
-          props?.class,
-          props?.className
-        );
-      };
+  const compose: Compose = ((...components) => {
+    const composeClassBuilder = ((props) => {
+      const propsWithoutClass = Object.fromEntries(
+        Object.entries(props || {}).filter(
+          ([key]) => !["class", "className"].includes(key),
+        ),
+      );
+
+      return cx(
+        components.map((component) => component(propsWithoutClass)),
+        props?.class,
+        props?.className,
+      );
+    }) as ReturnType<Compose>;
+
+    return Object.assign(composeClassBuilder, {
+      variants: components.reduce(
+        (variantsDraft, { variants }) => {
+          // eslint-disable-next-line guard-for-in
+          for (const variant in variants) {
+            variantsDraft[variant] ??= [];
+            variantsDraft[variant]!.push(...variants[variant]!);
+          }
+
+          return variantsDraft;
+        },
+        {} as {
+          [variant: string]: (string | number)[];
+        },
+      ),
+    });
+  }) as Compose;
 
   return {
     compose,
