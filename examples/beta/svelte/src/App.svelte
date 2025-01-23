@@ -1,8 +1,8 @@
 <script lang="ts">
   import Button from "./components/button.svelte";
 
-  const intents = [undefined, "primary", "secondary"] as const;
-  const sizes = [undefined, "medium", "small"] as const;
+  const intents = ["primary", "secondary"] as const;
+  const sizes = ["medium", "small"] as const;
   const isDisabled = [false, true] as const;
 </script>
 

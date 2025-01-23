@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import Button from "./components/Button.vue";
 
-const intents = [undefined, "primary", "secondary"] as const;
-const sizes = [undefined, "medium", "small"] as const;
+const intents = ["primary", "secondary"] as const;
+const sizes = ["medium", "small"] as const;
 const isDisabled = [undefined, ""] as const;
 </script>
 

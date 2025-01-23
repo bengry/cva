@@ -12,11 +12,18 @@ const button = cva({
     size: {
       small: ["text-sm", "py-1", "px-2"],
       medium: ["text-base", "py-2", "px-4"],
+      undefined: undefined,
     },
     disabled: {
       false: null,
       true: ["opacity-50", "cursor-not-allowed"],
+      undefined: undefined,
     },
+  },
+  defaultVariants: {
+    intent: undefined,
+    size: undefined,
+    disabled: undefined,
   },
   compoundVariants: [
     {

@@ -47,29 +47,67 @@ type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
 ) => void
   ? I
   : never;
+type AnyFunction = (...args: any[]) => any;
+type RequiredKeys<O extends object, K extends keyof O> = Omit<O, K> &
+  Required<Pick<O, K>>;
+type RequiredKeysOf<T extends object> = Exclude<
+  {
+    [Key in keyof T]: T extends Record<Key, T[Key]> ? Key : never;
+  }[keyof T],
+  undefined
+>;
 
-export type VariantProps<Component extends (...args: any) => any> = Omit<
+/**
+ * A private variant is a variant that is not meant to be used by the consumer, and is not exposed via `VariantProps`.
+ * Any variant that starts with a `$` is considered a private variant.
+ */
+type PrivateVariant<TVariantName extends string = string> = `$${TVariantName}`;
+
+export type VariantProps<Component extends AnyFunction> = Omit<
+  InternalVariantProps<Component>,
+  PrivateVariant
+>;
+
+type InternalVariantProps<Component extends (...args: any) => any> = Omit<
   OmitUndefined<Parameters<Component>[0]>,
   "class" | "className"
 >;
 
+const falsyToString = <T extends unknown>(value: T) =>
+  typeof value === "boolean" ? `${value}` : value === 0 ? "0" : value;
+
+const normalizeVariantKey = <T extends string>(value: T) => {
+  if (value === "true") return true;
+  if (value === "false") return false;
+
+  const maybeNumber = Number(value);
+  if (!Number.isNaN(maybeNumber)) return maybeNumber;
+
+  return value;
+};
+
 /* compose
   ---------------------------------- */
 
+type AnyCVABuilderFunction = AnyFunction & {
+  variants: never | Record<string, readonly VariantValue[]>;
+};
 export interface Compose {
-  <T extends ReturnType<CVA>[]>(
+  <T extends AnyCVABuilderFunction[]>(
     ...components: [...T]
-  ): (
-    props?: (
-      | UnionToIntersection<
-          {
-            [K in keyof T]: VariantProps<T[K]>;
-          }[number]
-        >
-      | undefined
-    ) &
-      CVAClassProp,
-  ) => string;
+  ): OptionalizeParameter<
+    (
+      props: UnionToIntersection<
+        {
+          // for every component, get its props
+          [K in keyof T]: InternalVariantProps<T[K]>;
+        }[number]
+      > &
+        CVAClassProp,
+    ) => string
+  > & {
+    variants: UnionToIntersection<Exclude<T[number]["variants"], never>>;
+  };
 }
 
 /* cx
@@ -100,39 +138,94 @@ type CVAClassProp =
       className?: ClassValue;
     };
 
+type CVAVariantSchemaProps<V extends CVAVariantSchema<any>, D> = Omit<
+  RequiredKeys<
+    V,
+    // Everything that doesn't have a default value declared
+    Exclude<keyof V, keyof D>
+  >,
+  PrivateVariant
+>;
+
 export interface CVA {
   <
     _ extends "cva's generic parameters are restricted to internal use only.",
-    V,
+    TVariants,
+    TDefaultVariants,
   >(
-    config: V extends CVAVariantShape
+    config: TVariants extends CVAVariantShape
       ? CVAConfigBase & {
-          variants?: V;
-          compoundVariants?: (V extends CVAVariantShape
+          variants?: TVariants;
+          compoundVariants?: (TVariants extends CVAVariantShape
             ? (
-                | CVAVariantSchema<V>
+                | CVAVariantSchema<TVariants>
                 | {
-                    [Variant in keyof V]?:
-                      | StringToBoolean<keyof V[Variant]>
-                      | StringToBoolean<keyof V[Variant]>[]
+                    [Variant in keyof TVariants]?:
+                      | StringToBoolean<keyof TVariants[Variant]>
+                      | readonly StringToBoolean<keyof TVariants[Variant]>[]
                       | undefined;
                   }
               ) &
                 CVAClassProp
             : CVAClassProp)[];
-          defaultVariants?: CVAVariantSchema<V>;
+          /**
+           * The default values that will be used when a variant is not provided.
+           * To mark a property as optional without specifying a value, use `undefined`.
+           *
+           * @example
+           * ```ts
+           * const box = cva({
+           *   variants: {
+           *     border: {
+           *       true: '...'
+           *     }
+           *   },
+           *   defaultVariants: {
+           *     border: undefined
+           *   }
+           * })
+           * ```
+           */
+          defaultVariants?: CVAVariantSchema<TVariants> & TDefaultVariants;
         }
       : CVAConfigBase & {
           variants?: never;
           compoundVariants?: never;
           defaultVariants?: never;
         },
-  ): (
-    props?: V extends CVAVariantShape
-      ? CVAVariantSchema<V> & CVAClassProp
-      : CVAClassProp,
-  ) => string;
+  ): OptionalizeParameter<
+    (
+      props: CVAClassProp &
+        (TVariants extends CVAVariantShape
+          ? CVAVariantSchemaProps<CVAVariantSchema<TVariants>, TDefaultVariants>
+          : {}),
+    ) => string
+  > & {
+    variants: TVariants extends CVAVariantShape
+      ? {
+          [K in Exclude<keyof TVariants, PrivateVariant>]: ReadonlyArray<
+            StringToBoolean<Extract<keyof TVariants[K], VariantValue>>
+          >;
+        }
+      : never;
+  };
 }
+
+/**
+ * A function that accepts one parameter `T` and returns another parameter `R`.
+ */
+type UnaryFunction<in T, R> = (arg: T) => R;
+
+/**
+ * Takes in an unary function and returns the same function, with the first parameter being optional, if the original function's first parameter is an
+ * object with all of its keys being optional.
+ */
+type OptionalizeParameter<F extends UnaryFunction<any, any>> =
+  RequiredKeysOf<Parameters<F>[0]> extends []
+    ? (arg?: Parameters<F>[0]) => ReturnType<F>
+    : F;
+
+type VariantValue = string | number | boolean;
 
 /* defineConfig
   ---------------------------------- */
@@ -140,7 +233,7 @@ export interface CVA {
 export interface DefineConfigOptions {
   hooks?: {
     /**
-     * @deprecated please use `onComplete`
+     * @deprecated please use `onComplete`
      */
     "cx:done"?: (className: string) => string;
     /**
@@ -161,78 +254,97 @@ export interface DefineConfig {
 /* Exports
   ============================================ */
 
-const falsyToString = <T extends unknown>(value: T) =>
-  typeof value === "boolean" ? `${value}` : value === 0 ? "0" : value;
-
 export const defineConfig: DefineConfig = (options) => {
   const cx: CX = (...inputs) => {
-    if (typeof options?.hooks?.["cx:done"] !== "undefined")
+    if (options?.hooks?.["cx:done"] !== undefined)
       return options?.hooks["cx:done"](clsx(inputs));
 
-    if (typeof options?.hooks?.onComplete !== "undefined")
+    if (options?.hooks?.onComplete !== undefined)
       return options?.hooks.onComplete(clsx(inputs));
 
     return clsx(inputs);
   };
 
-  const cva: CVA = (config) => (props) => {
-    if (config?.variants == null)
-      return cx(config?.base, props?.class, props?.className);
+  const cva: CVA = (config) => {
+    const { variants, defaultVariants } = config ?? {};
 
-    const { variants, defaultVariants } = config;
+    const cvaClassBuilder = ((props) => {
+      if (variants == null)
+        return cx(config?.base, props?.class, props?.className);
 
-    const getVariantClassNames = Object.keys(variants).map(
-      (variant: keyof typeof variants) => {
-        const variantProp = props?.[variant as keyof typeof props];
-        const defaultVariantProp = defaultVariants?.[variant];
+      const getVariantClassNames = Object.keys(variants).map(
+        (variant: keyof typeof variants) => {
+          const variantProp = props?.[variant as keyof typeof props];
+          const defaultVariantProp = defaultVariants?.[variant];
 
-        const variantKey = (falsyToString(variantProp) ||
-          falsyToString(
-            defaultVariantProp,
-          )) as keyof (typeof variants)[typeof variant];
+          const variantKey = (falsyToString(variantProp) ||
+            falsyToString(
+              defaultVariantProp,
+            )) as keyof (typeof variants)[typeof variant];
 
-        return variants[variant][variantKey];
-      },
-    );
+          return variants[variant]![variantKey];
+        },
+      );
 
-    const defaultsAndProps = {
-      ...defaultVariants,
-      // remove `undefined` props
-      ...(props &&
-        Object.entries(props).reduce<typeof props>(
-          (acc, [key, value]) =>
-            typeof value === "undefined" ? acc : { ...acc, [key]: value },
-          {} as typeof props,
-        )),
-    };
+      const defaultsAndProps = {
+        ...defaultVariants,
+        // remove `undefined` props
+        ...(props &&
+          Object.entries(props).reduce<typeof props>(
+            (acc, [key, value]) => {
+              if (value !== undefined) {
+                Object.assign(acc, { [key]: value });
+              }
 
-    const getCompoundVariantClassNames = config?.compoundVariants?.reduce(
-      (acc, { class: cvClass, className: cvClassName, ...cvConfig }) =>
-        Object.entries(cvConfig).every(([cvKey, cvSelector]) => {
-          const selector =
-            defaultsAndProps[cvKey as keyof typeof defaultsAndProps];
+              return acc;
+            },
+            {} as typeof props,
+          )),
+      };
 
-          return Array.isArray(cvSelector)
-            ? cvSelector.includes(selector)
-            : selector === cvSelector;
-        })
-          ? [...acc, cvClass, cvClassName]
-          : acc,
-      [] as ClassValue[],
-    );
+      const getCompoundVariantClassNames = config?.compoundVariants?.reduce(
+        (acc, { class: cvClass, className: cvClassName, ...cvConfig }) =>
+          Object.entries(cvConfig).every(([cvKey, cvSelector]) => {
+            const selector =
+              defaultsAndProps[cvKey as keyof typeof defaultsAndProps];
 
-    return cx(
-      config?.base,
-      getVariantClassNames,
-      getCompoundVariantClassNames,
-      props?.class,
-      props?.className,
-    );
+            return Array.isArray(cvSelector)
+              ? cvSelector.includes(selector)
+              : selector === cvSelector;
+          })
+            ? [...acc, cvClass, cvClassName]
+            : acc,
+        [] as ClassValue[],
+      );
+
+      return cx(
+        config?.base,
+        getVariantClassNames,
+        getCompoundVariantClassNames,
+        props?.class,
+        props?.className,
+      );
+    }) as ReturnType<CVA>;
+
+    return Object.assign(cvaClassBuilder, {
+      variants: variants
+        ? Object.fromEntries(
+            Object.entries(variants)
+              // filter out private variants
+              .filter(([variantKey]) => !variantKey.startsWith("$"))
+              .map(([key, value]) => [
+                key,
+                Object.keys(value).map((propertyKey) =>
+                  normalizeVariantKey(propertyKey),
+                ),
+              ]),
+          )
+        : {},
+    });
   };
 
-  const compose: Compose =
-    (...components) =>
-    (props) => {
+  const compose: Compose = ((...components) => {
+    const composeClassBuilder = ((props) => {
       const propsWithoutClass = Object.fromEntries(
         Object.entries(props || {}).filter(
           ([key]) => !["class", "className"].includes(key),
@@ -244,7 +356,31 @@ export const defineConfig: DefineConfig = (options) => {
         props?.class,
         props?.className,
       );
-    };
+    }) as ReturnType<Compose>;
+
+    return Object.assign(composeClassBuilder, {
+      variants: components.reduce(
+        (variantsDraft, { variants }) => {
+          // eslint-disable-next-line guard-for-in
+          for (const variant in variants) {
+            // If both have the same values (e.g. size, and both have xsmall, small, ...), you end up with an array like:
+            // ['xsmall', 'small', ..., 'xsmall', 'small', ...] instead of just ['xsmall', 'small', ...]
+            variantsDraft[variant] = [
+              ...new Set([
+                ...(variantsDraft[variant] ?? []),
+                ...(variants[variant] ?? []),
+              ]),
+            ];
+          }
+
+          return variantsDraft;
+        },
+        {} as {
+          [variant: string]: VariantValue[];
+        },
+      ),
+    });
+  }) as Compose;
 
   return {
     compose,
