@@ -97,7 +97,10 @@ describe("compose", () => {
     expect(card({ shadow: "md", gap: 3, className: "adhoc-class" })).toBe(
       "shadow-md gap-3 adhoc-class",
     );
-    expect(card.variants).toEqual(["shadow", "gap"]);
+    expect(card.variants).toEqual({
+      shadow: expect.arrayContaining(["sm", "md"]),
+      gap: expect.arrayContaining([1, 2, 3, "unset"]),
+    });
   });
 });
 
@@ -214,6 +217,12 @@ describe("cva", () => {
             1: "m-1",
           },
         },
+        defaultVariants: {
+          m: undefined,
+          disabled: undefined,
+          intent: undefined,
+          size: undefined,
+        },
         compoundVariants: [
           {
             intent: "primary",
@@ -292,6 +301,12 @@ describe("cva", () => {
             ],
           },
         ],
+        defaultVariants: {
+          m: undefined,
+          disabled: undefined,
+          intent: undefined,
+          size: undefined,
+        },
       });
 
       const buttonWithoutBaseWithoutDefaultsArray = cva({
@@ -344,6 +359,12 @@ describe("cva", () => {
             0: "m-0",
             1: "m-1",
           },
+        },
+        defaultVariants: {
+          m: undefined,
+          disabled: undefined,
+          intent: undefined,
+          size: undefined,
         },
         compoundVariants: [
           {
@@ -417,6 +438,12 @@ describe("cva", () => {
             1: "m-1",
           },
         },
+        defaultVariants: {
+          m: undefined,
+          disabled: undefined,
+          intent: undefined,
+          size: undefined,
+        },
         compoundVariants: [
           {
             intent: "primary",
@@ -450,11 +477,8 @@ describe("cva", () => {
           >;
 
       describe.each<[ButtonWithoutDefaultsWithoutBaseProps, string]>([
-        [
-          // @ts-expect-error
-          undefined,
-          "",
-        ],
+        // @ts-expect-error
+        [undefined, ""],
         [{}, ""],
         [
           {
@@ -997,6 +1021,12 @@ describe("cva", () => {
             large: "button--large text-lg py-2.5 px-4",
           },
         },
+        defaultVariants: {
+          m: undefined,
+          disabled: undefined,
+          intent: undefined,
+          size: undefined,
+        },
         compoundVariants: [
           {
             intent: "primary",
@@ -1059,6 +1089,12 @@ describe("cva", () => {
             medium: "button--medium text-base py-2 px-4",
             large: "button--large text-lg py-2.5 px-4",
           },
+        },
+        defaultVariants: {
+          m: undefined,
+          disabled: undefined,
+          intent: undefined,
+          size: undefined,
         },
         compoundVariants: [
           {
@@ -1138,6 +1174,12 @@ describe("cva", () => {
             large: ["button--large", "text-lg", "py-2.5", "px-4"],
           },
         },
+        defaultVariants: {
+          m: undefined,
+          disabled: undefined,
+          intent: undefined,
+          size: undefined,
+        },
         compoundVariants: [
           {
             intent: "primary",
@@ -1214,6 +1256,12 @@ describe("cva", () => {
             medium: ["button--medium", "text-base", "py-2", "px-4"],
             large: ["button--large", "text-lg", "py-2.5", "px-4"],
           },
+        },
+        defaultVariants: {
+          m: undefined,
+          disabled: undefined,
+          intent: undefined,
+          size: undefined,
         },
         compoundVariants: [
           {
@@ -1739,18 +1787,24 @@ describe("cva", () => {
       ])("button(%o)", (options, expected) => {
         test(`returns ${expected}`, () => {
           expect(buttonWithBaseWithDefaultsString(options)).toBe(expected);
-          expect(buttonWithBaseWithDefaultsString.variants).toEqual([
-            "intent",
-            "disabled",
-            "size",
-          ]);
+          expect(buttonWithBaseWithDefaultsString.variants).toEqual({
+            intent: expect.arrayContaining([
+              "unset",
+              "primary",
+              "secondary",
+              "warning",
+              "danger",
+            ]),
+            disabled: expect.arrayContaining([true, false, "unset"]),
+            size: expect.arrayContaining(["unset", "small", "medium", "large"]),
+          });
           expectTypeOf(
             buttonWithBaseWithDefaultsString.variants,
           ).toEqualTypeOf<{
             intent: ReadonlyArray<
               "unset" | "primary" | "secondary" | "warning" | "danger"
             >;
-            disabled: ReadonlyArray<"true" | "false" | "unset">;
+            disabled: ReadonlyArray<boolean | "unset">;
             size: ReadonlyArray<"unset" | "small" | "medium" | "large">;
           }>();
           expect(buttonWithBaseWithDefaultsWithClassNameString(options)).toBe(
@@ -1762,6 +1816,95 @@ describe("cva", () => {
           );
         });
       });
+    });
+  });
+
+  describe("constructor", () => {
+    const button = cva({
+      variants: {
+        intent: {
+          primary: "bg-blue-500",
+          secondary: "bg-white",
+        },
+      },
+    });
+
+    const optionalIntent = cva({
+      variants: {
+        intent: {
+          primary: "bg-blue-500",
+          secondary: "bg-white",
+        },
+      },
+      defaultVariants: {
+        intent: "primary",
+      },
+    });
+
+    test("should require parameters when no default variants are provided", () => {
+      expectTypeOf(button).parameter(0).toMatchTypeOf<{
+        intent: "primary" | "secondary";
+      }>();
+    });
+
+    test("should not require parameters when default variants are provided", () => {
+      expectTypeOf(optionalIntent).parameter(0).toMatchTypeOf<
+        | {
+            intent?: "primary" | "secondary";
+          }
+        | undefined
+      >();
+    });
+  });
+
+  describe("private variants", () => {
+    const button = cva({
+      variants: {
+        intent: {
+          primary: "bg-blue-500",
+          secondary: "bg-white",
+        },
+        $private: {
+          true: "private",
+        },
+      },
+    });
+
+    const card = cva({
+      variants: {
+        border: {
+          true: "",
+          false: "",
+        },
+        $private2: {
+          true: "private",
+        },
+      },
+      defaultVariants: {
+        $private: true,
+      },
+    });
+
+    const composed = compose(button, card);
+
+    test("private variants are not exposed", () => {
+      expectTypeOf(button.variants).toEqualTypeOf<{
+        intent: ReadonlyArray<"primary" | "secondary">;
+      }>();
+
+      expectTypeOf(composed.variants).toMatchTypeOf<{
+        intent: ReadonlyArray<"primary" | "secondary">;
+        border: ReadonlyArray<boolean>;
+      }>();
+
+      expectTypeOf(button).parameter(0).not.toMatchTypeOf<{
+        $private: any;
+      }>();
+
+      expectTypeOf(composed).parameter(0).not.toMatchTypeOf<{
+        $private: any;
+        $private2: any;
+      }>();
     });
   });
 });

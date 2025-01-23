@@ -50,6 +50,12 @@ type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
 type AnyFunction = (...args: any[]) => any;
 type RequiredKeys<O extends object, K extends keyof O> = Omit<O, K> &
   Required<Pick<O, K>>;
+type RequiredKeysOf<T extends object> = Exclude<
+  {
+    [Key in keyof T]: T extends Record<Key, T[Key]> ? Key : never;
+  }[keyof T],
+  undefined
+>;
 
 /**
  * A private variant is a variant that is not meant to be used by the consumer, and is not exposed via `VariantProps`.
@@ -70,6 +76,16 @@ type InternalVariantProps<Component extends (...args: any) => any> = Omit<
 const falsyToString = <T extends unknown>(value: T) =>
   typeof value === "boolean" ? `${value}` : value === 0 ? "0" : value;
 
+const normalizeVariantKey = <T extends string>(value: T) => {
+  if (value === "true") return true;
+  if (value === "false") return false;
+
+  const maybeNumber = Number(value);
+  if (!Number.isNaN(maybeNumber)) return maybeNumber;
+
+  return value;
+};
+
 /* compose
   ---------------------------------- */
 
@@ -79,15 +95,17 @@ type AnyCVABuilderFunction = AnyFunction & {
 export interface Compose {
   <T extends AnyCVABuilderFunction[]>(
     ...components: [...T]
-  ): ((
-    props: UnionToIntersection<
-      {
-        // for every component, get its props
-        [K in keyof T]: InternalVariantProps<T[K]>;
-      }[number]
-    > &
-      CVAClassProp,
-  ) => string) & {
+  ): OptionalizeParameter<
+    (
+      props: UnionToIntersection<
+        {
+          // for every component, get its props
+          [K in keyof T]: InternalVariantProps<T[K]>;
+        }[number]
+      > &
+        CVAClassProp,
+    ) => string
+  > & {
     variants: UnionToIntersection<Exclude<T[number]["variants"], never>>;
   };
 }
@@ -120,10 +138,13 @@ type CVAClassProp =
       className?: ClassValue;
     };
 
-type CVAVariantSchemaProps<V extends CVAVariantSchema<any>, D> = RequiredKeys<
-  V,
-  // Everything that doesn't have a default value declared
-  Exclude<keyof V, keyof D>
+type CVAVariantSchemaProps<V extends CVAVariantSchema<any>, D> = Omit<
+  RequiredKeys<
+    V,
+    // Everything that doesn't have a default value declared
+    Exclude<keyof V, keyof D>
+  >,
+  PrivateVariant
 >;
 
 export interface CVA {
@@ -182,7 +203,7 @@ export interface CVA {
   > & {
     variants: TVariants extends CVAVariantShape
       ? {
-          [K in Exclude<keyof TVariants, `$${string}`>]: ReadonlyArray<
+          [K in Exclude<keyof TVariants, PrivateVariant>]: ReadonlyArray<
             StringToBoolean<Extract<keyof TVariants[K], VariantValue>>
           >;
         }
@@ -199,12 +220,10 @@ type UnaryFunction<in T, R> = (arg: T) => R;
  * Takes in an unary function and returns the same function, with the first parameter being optional, if the original function's first parameter is an
  * object with all of its keys being optional.
  */
-type OptionalizeParameter<F extends UnaryFunction<any, any>> = F extends (
-  // the single parameter of the function is equal to itself when all of its keys are optional (i.e. `T == Partial<T>`)
-  arg: Partial<Parameters<F>[0]>,
-) => infer R
-  ? (arg?: Parameters<F>[0]) => R
-  : F;
+type OptionalizeParameter<F extends UnaryFunction<any, any>> =
+  RequiredKeysOf<Parameters<F>[0]> extends []
+    ? (arg?: Parameters<F>[0]) => ReturnType<F>
+    : F;
 
 type VariantValue = string | number | boolean;
 
@@ -313,7 +332,12 @@ export const defineConfig: DefineConfig = (options) => {
             Object.entries(variants)
               // filter out private variants
               .filter(([variantKey]) => !variantKey.startsWith("$"))
-              .map(([key, value]) => [key, Object.keys(value)]),
+              .map(([key, value]) => [
+                key,
+                Object.keys(value).map((propertyKey) =>
+                  normalizeVariantKey(propertyKey),
+                ),
+              ]),
           )
         : {},
     });
