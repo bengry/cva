@@ -1,9 +1,9 @@
 ![CVA](/docs/latest/public/assets/img/wallpaper-hd.jpg)
 
-<h1 align="center">cva</h1>
+<h1 align="center">cva-extended</h1>
 
 <p align="center">
-  <strong>C</strong>lass <strong>V</strong>ariance <strong>A</strong>uthority
+  <strong>C</strong>lass <strong>V</strong>ariance <strong>A</strong>uthority - Extended
 </p>
 
 <p align="center">
@@ -20,8 +20,8 @@
   <a href="https://bundlephobia.com/result?p=class-variance-authority">
     <img alt="Minizipped Size" src="https://img.shields.io/bundlephobia/minzip/class-variance-authority" />
   </a>
-  <a href="https://github.com/joe-bell/cva/blob/main/LICENSE">
-    <img alt="Apache-2.0 License" src="https://badgen.net/github/license/joe-bell/cva" />
+  <a href="https://github.com/bengry/cva-extended/blob/main/LICENSE">
+    <img alt="Apache-2.0 License" src="https://badgen.net/github/license/bengry/cva-extended" />
   </a>
   <a href="https://www.npmjs.com/package/class-variance-authority">
     <img alt="NPM Downloads" src="https://badgen.net/npm/dm/class-variance-authority" />
@@ -36,7 +36,7 @@
 <a href="https://polar.sh/cva"><picture><source media="(prefers-color-scheme: dark)" srcset="https://polar.sh/embed/tiers.svg?org=cva&darkmode"><img alt="Subscription Tiers on Polar" src="https://polar.sh/embed/tiers.svg?org=cva"></picture></a>
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/joe-bell/cva/refs/heads/main/.github/static/sponsorkit/sponsors.svg">
+  <a href="https://raw.githubusercontent.com/bengry/cva-extended/refs/heads/main/.github/static/sponsorkit/sponsors.svg">
     <img src='./.github/static/sponsorkit/sponsors.svg'/>
   </a>
 </p>

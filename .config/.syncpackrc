@@ -9,11 +9,12 @@
         "root",
         "docs-*",
         "cva",
+        "cva-extended",
         "class-variance-authority",
         "@cva/**"
       ],
       "dependencies": [
-        "cva",
+        "cva-extended",
         "class-variance-authority"
       ],
       "dependencyTypes": [

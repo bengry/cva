@@ -1,5 +1,5 @@
-import type * as CVA from "./";
-import { compose, cva, cx, defineConfig } from "./";
+import type * as CVA from ".";
+import { compose, cva, cx, defineConfig } from ".";
 
 describe("cx", () => {
   describe.each<CVA.CXOptions>([

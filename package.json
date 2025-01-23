@@ -38,7 +38,7 @@
   "pnpm": {
     "overrides": {
       "class-variance-authority": "workspace:*",
-      "cva": "workspace:*"
+      "cva-extended": "workspace:*"
     }
   }
 }

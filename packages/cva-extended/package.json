@@ -1,7 +1,7 @@
 {
-  "name": "cva",
-  "version": "1.0.0-beta.3",
-  "description": "Class Variance Authority 🧬",
+  "name": "cva-extended",
+  "version": "2.0.0",
+  "description": "Class Variance Authority 🧬 - Extended",
   "keywords": [
     "Class Variance Authority",
     "class-variance-authority",
@@ -14,12 +14,18 @@
     "vanilla-extract",
     "variants"
   ],
-  "homepage": "https://github.com/joe-bell/cva#readme",
-  "bugs": "https://github.com/joe-bell/cva/issues",
-  "repository": "https://github.com/joe-bell/cva.git",
+  "homepage": "https://github.com/bengry/cva-extended#readme",
+  "bugs": "https://github.com/bengry/cva-extended/issues",
+  "repository": "https://github.com/bengry/cva-extended.git",
   "funding": "https://polar.sh/cva",
   "license": "Apache-2.0",
   "author": "Joe Bell (https://joebell.co.uk)",
+  "contributors": [
+    {
+      "name": "Ben Grynhaus",
+      "url": "https://github.com/bengry"
+    }
+  ],
   "exports": {
     "import": "./src/index.ts",
     "types": "./src/index.ts"

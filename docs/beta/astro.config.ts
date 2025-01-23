@@ -10,7 +10,7 @@ const config = {
   title: "cva@beta",
   favicon: "/assets/img/favicon.png",
   editLink: {
-    baseUrl: "https://github.com/joe-bell/cva/tree/main/docs/beta/",
+    baseUrl: "https://github.com/bengry/cva-extended/tree/main/docs/beta/",
   },
 };
 
@@ -26,7 +26,7 @@ export default defineConfig({
       credits: false,
       logo: { src: "./src/assets/logo.svg", replacesTitle: true },
       social: {
-        github: "https://github.com/joe-bell/cva",
+        github: "https://github.com/bengry/cva-extended",
         blueSky: "https://joebell.co.uk/bluesky",
       },
       tagline: "Class Variance Authority",
@@ -195,7 +195,7 @@ export default defineConfig({
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
               gtag('js', new Date());
-                
+
               gtag('config', '${googleAnalyticsId}');
             `,
         },
