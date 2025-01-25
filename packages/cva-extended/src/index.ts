@@ -14,6 +14,7 @@
  * the License.
  */
 import { clsx } from "clsx";
+import { variantsKey } from "./_internal/symbols";
 
 /* Types
   ============================================ */
@@ -47,7 +48,7 @@ type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
 ) => void
   ? I
   : never;
-type AnyFunction = (...args: any[]) => any;
+export type AnyFunction = (...args: any[]) => any;
 type RequiredKeys<O extends object, K extends keyof O> = Omit<O, K> &
   Required<Pick<O, K>>;
 type RequiredKeysOf<T extends object> = Exclude<
@@ -76,21 +77,11 @@ type InternalVariantProps<Component extends (...args: any) => any> = Omit<
 const falsyToString = <T extends unknown>(value: T) =>
   typeof value === "boolean" ? `${value}` : value === 0 ? "0" : value;
 
-const normalizeVariantKey = <T extends string>(value: T) => {
-  if (value === "true") return true;
-  if (value === "false") return false;
-
-  const maybeNumber = Number(value);
-  if (!Number.isNaN(maybeNumber)) return maybeNumber;
-
-  return value;
-};
-
 /* compose
   ---------------------------------- */
 
-type AnyCVABuilderFunction = AnyFunction & {
-  variants: never | Record<string, readonly VariantValue[]>;
+export type AnyCVABuilderFunction = AnyFunction & {
+  [variantsKey]: never | CVAVariantShape;
 };
 export interface Compose {
   <T extends AnyCVABuilderFunction[]>(
@@ -106,7 +97,9 @@ export interface Compose {
         CVAClassProp,
     ) => string
   > & {
-    variants: UnionToIntersection<Exclude<T[number]["variants"], never>>;
+    [variantsKey]: UnionToIntersection<
+      Exclude<T[number][typeof variantsKey], never>
+    >;
   };
 }
 
@@ -200,15 +193,7 @@ export interface CVA {
           ? CVAVariantSchemaProps<CVAVariantSchema<TVariants>, TDefaultVariants>
           : {}),
     ) => string
-  > & {
-    variants: TVariants extends CVAVariantShape
-      ? {
-          [K in Exclude<keyof TVariants, PrivateVariant>]: ReadonlyArray<
-            StringToBoolean<Extract<keyof TVariants[K], VariantValue>>
-          >;
-        }
-      : never;
-  };
+  >;
 }
 
 /**
@@ -225,7 +210,6 @@ type OptionalizeParameter<F extends UnaryFunction<any, any>> =
     ? (arg?: Parameters<F>[0]) => ReturnType<F>
     : F;
 
-type VariantValue = string | number | boolean;
 
 /* defineConfig
   ---------------------------------- */
@@ -282,7 +266,7 @@ export const defineConfig: DefineConfig = (options) => {
               defaultVariantProp,
             )) as keyof (typeof variants)[typeof variant];
 
-          return variants[variant]![variantKey];
+          return variants[variant][variantKey];
         },
       );
 
@@ -327,19 +311,7 @@ export const defineConfig: DefineConfig = (options) => {
     }) as ReturnType<CVA>;
 
     return Object.assign(cvaClassBuilder, {
-      variants: variants
-        ? Object.fromEntries(
-            Object.entries(variants)
-              // filter out private variants
-              .filter(([variantKey]) => !variantKey.startsWith("$"))
-              .map(([key, value]) => [
-                key,
-                Object.keys(value).map((propertyKey) =>
-                  normalizeVariantKey(propertyKey),
-                ),
-              ]),
-          )
-        : {},
+      [variantsKey]: variants,
     });
   };
 
@@ -358,28 +330,7 @@ export const defineConfig: DefineConfig = (options) => {
       );
     }) as ReturnType<Compose>;
 
-    return Object.assign(composeClassBuilder, {
-      variants: components.reduce(
-        (variantsDraft, { variants }) => {
-          // eslint-disable-next-line guard-for-in
-          for (const variant in variants) {
-            // If both have the same values (e.g. size, and both have xsmall, small, ...), you end up with an array like:
-            // ['xsmall', 'small', ..., 'xsmall', 'small', ...] instead of just ['xsmall', 'small', ...]
-            variantsDraft[variant] = [
-              ...new Set([
-                ...(variantsDraft[variant] ?? []),
-                ...(variants[variant] ?? []),
-              ]),
-            ];
-          }
-
-          return variantsDraft;
-        },
-        {} as {
-          [variant: string]: VariantValue[];
-        },
-      ),
-    });
+    return composeClassBuilder;
   }) as Compose;
 
   return {
